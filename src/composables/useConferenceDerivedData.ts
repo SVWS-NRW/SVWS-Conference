@@ -158,11 +158,16 @@ export function buildConferenceDerivedData(params: {
       const fachKuerzel = fach.kuerzelAnzeige || fach.kuerzel
 
       const leistung = selectedSchueler.schueler.leistungsdaten.find((ld: any) => ld.lerngruppenID === lgId)
+      // Differenzierungskurs (Gesamtschule): E- und G-Niveau teilen sich eine Lerngruppe (Kursart DK),
+      // angezeigt wird die schülerindividuelle Kursart.
+      const kursart = lerngruppe?.kursartKuerzel === 'DK'
+        ? `${leistung?.istDifferenzierungkursErweitert ? 'E' : 'G'} (DK)`
+        : (lerngruppe?.kursartKuerzel ?? '–')
       return [{
         fachId: fach.id,
         fachKuerzel,
         fachName: fach.bezeichnung?.trim() || fachKuerzel,
-        kursart: lerngruppe?.kursartKuerzel ?? '–',
+        kursart,
         lehrerText: lehrerKuerzel.length ? lehrerKuerzel.join(', ') : '–',
         lgId,
         note,
