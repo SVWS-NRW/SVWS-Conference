@@ -6,6 +6,27 @@ type NumericGrade = (note: Notenkuerzel | null) => number | null
 type ReadLerngruppeId = (entry: unknown) => number | null
 type FormatTimer = (seconds: number) => string
 
+/** Feste Breite der Mahnungsspalte in der Lupe (nicht in der Größe veränderbar). */
+export const LUPE_MAHNUNG_COL_WIDTH = 56
+
+export type MahnungStatus = {
+  /** 'markiert': Mahnung gesetzt, aber noch ohne Mahndatum (rot); 'gemahnt': Mahndatum eingetragen (grün) */
+  state: 'markiert' | 'gemahnt'
+  /** Kurzes Datum (TT.MM.) bzw. leer */
+  kurz: string
+  /** Hinweistext für das Tooltip */
+  titel: string
+}
+
+/** Mahnlogik wie in SchILD (Leistungsdaten, „Akt. Halbjahr“): ohne Mahnung keine Anzeige, ohne Datum rot, mit Datum grün. */
+function getMahnungStatus(istGemahnt: boolean | undefined, mahndatum: string | null | undefined): MahnungStatus | null {
+  if (!istGemahnt) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(mahndatum ?? '')
+  if (!match) return { state: 'markiert', kurz: '!', titel: 'Mahnung markiert, noch nicht gemahnt (kein Mahndatum)' }
+  const [, jahr, monat, tag] = match
+  return { state: 'gemahnt', kurz: `${tag}.${monat}.`, titel: `Gemahnt am ${tag}.${monat}.${jahr}` }
+}
+
 export function buildConferenceDerivedData(params: {
   store: any
   klasse: any
@@ -176,6 +197,14 @@ export function buildConferenceDerivedData(params: {
         fehlstundenUnentschuldigtFach: store.getFachbezogeneFehlstundenValue(selectedSchueler.schueler.id, lgId, 'fehlstundenUnentschuldigtFach'),
         fachbezogeneBemerkung: store.getFachbezogeneBemerkungValue(selectedSchueler.schueler.id, lgId),
         teilleistungen: leistung?.teilleistungen ?? [],
+        kursartRoh: lerngruppe?.kursartKuerzel ?? null,
+        // Fachleistungsdifferenzierung: Differenzierungs-, E- oder G-Kurs bzw. bereits vorhandene Zuweisung
+        istFld: ['DK', 'E', 'G'].includes(lerngruppe?.kursartKuerzel ?? '') || !!store.getZuweisung(selectedSchueler.schueler.id, lgId),
+        zuweisung: store.getZuweisung(selectedSchueler.schueler.id, lgId),
+        zuweisungGeaendert: store.isZuweisungChanged(selectedSchueler.schueler.id, lgId),
+        mahnung: getMahnungStatus(store.getMahnung(selectedSchueler.schueler.id, lgId), leistung?.mahndatum),
+        mahnungEditierbar: store.isMahnungEditable(selectedSchueler.schueler.id, lgId),
+        mahnungGeaendert: store.isMahnungChanged(selectedSchueler.schueler.id, lgId),
       }]
     })
     : []
@@ -188,6 +217,7 @@ export function buildConferenceDerivedData(params: {
     + lupeColumnWidths.lehrer
     + (lupeFehlstundenMode === 'fach' ? lupeColumnWidths.fs + lupeColumnWidths.fsu : 0)
     + lupeColumnWidths.note
+    + LUPE_MAHNUNG_COL_WIDTH
     + 260
 
   return {

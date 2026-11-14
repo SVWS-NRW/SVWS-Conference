@@ -33,6 +33,32 @@ export function buildChangeLogData(store: any): {
     }
   })
 
+  const mahnungChanges = store.listMahnungChanges().map((change: any) => {
+    const schueler = schuelerById.get(change.schuelerId)
+    const lerngruppe = lerngruppeById.get(change.lerngruppeId)
+    const fach = lerngruppe ? fachById.get(lerngruppe.fachID) : null
+    return {
+      typ: 'Mahnung',
+      schuelerName: schueler ? `${schueler.nachname}, ${schueler.vorname}` : `ID ${change.schuelerId}`,
+      feld: fach?.kuerzelAnzeige || fach?.kuerzel || `Lerngruppe ${change.lerngruppeId}`,
+      alt: change.originalValue ? 'gemahnt' : 'nicht gemahnt',
+      neu: change.newValue ? 'gemahnt' : 'nicht gemahnt',
+    }
+  })
+
+  const zuweisungChanges = store.listZuweisungChanges().map((change: any) => {
+    const schueler = schuelerById.get(change.schuelerId)
+    const lerngruppe = lerngruppeById.get(change.lerngruppeId)
+    const fach = lerngruppe ? fachById.get(lerngruppe.fachID) : null
+    return {
+      typ: 'Zuweisung',
+      schuelerName: schueler ? `${schueler.nachname}, ${schueler.vorname}` : `ID ${change.schuelerId}`,
+      feld: fach?.kuerzelAnzeige || fach?.kuerzel || `Lerngruppe ${change.lerngruppeId}`,
+      alt: change.originalValue ?? '–',
+      neu: change.newValue ?? '–',
+    }
+  })
+
   const bemerkungLabels = {
     ASV: 'Arbeits- und Sozialverhalten',
     AUE: 'Ausserunterrichtliches Engagement',
@@ -117,6 +143,8 @@ export function buildChangeLogData(store: any): {
   const allChanges = [
     ...noteChanges,
     ...noteQuartalChanges,
+    ...mahnungChanges,
+    ...zuweisungChanges,
     ...fehlstundenChanges,
     ...fachbezogeneFehlstundenChanges,
     ...bemerkungChanges,

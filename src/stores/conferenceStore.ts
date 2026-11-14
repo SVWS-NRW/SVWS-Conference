@@ -38,6 +38,20 @@ type NoteChange = {
   newNote: Notenkuerzel | null
 }
 
+type MahnungChange = {
+  schuelerId: number
+  lerngruppeId: number
+  originalValue: boolean
+  newValue: boolean
+}
+
+type ZuweisungChange = {
+  schuelerId: number
+  lerngruppeId: number
+  originalValue: string | null
+  newValue: string | null
+}
+
 type BemerkungChange = {
   schuelerId: number
   field: 'ASV' | 'AUE' | 'ZB'
@@ -241,6 +255,8 @@ export const useConferenceStore = defineStore('conference', () => {
   const lernbereichNoteChanges = ref<Map<string, Notenkuerzel | null>>(new Map())
   const teilleistungNoteChanges = ref<Map<string, Notenkuerzel | null>>(new Map())
   const noteQuartalChanges = ref<Map<string, Notenkuerzel | null>>(new Map())
+  const mahnungChanges = ref<Map<string, boolean>>(new Map())
+  const zuweisungChanges = ref<Map<string, string | null>>(new Map())
   const dataSource = ref<DataSource>(null)
   const lastServerConnection = ref<ServerConnectionParams | null>(null)
 
@@ -412,8 +428,12 @@ export const useConferenceStore = defineStore('conference', () => {
   const teilleistungNoteChangeCount = computed(() => teilleistungNoteChanges.value.size)
   const hasNoteQuartalChanges = computed(() => noteQuartalChanges.value.size > 0)
   const noteQuartalChangeCount = computed(() => noteQuartalChanges.value.size)
-  const hasAnyChanges = computed(() => noteChanges.value.size > 0 || bemerkungChanges.value.size > 0 || fachbezogeneBemerkungChanges.value.size > 0 || fehlstundenChanges.value.size > 0 || fachbezogeneFehlstundenChanges.value.size > 0 || lernbereichNoteChanges.value.size > 0 || teilleistungNoteChanges.value.size > 0 || noteQuartalChanges.value.size > 0)
-  const totalChangeCount = computed(() => noteChanges.value.size + bemerkungChanges.value.size + fachbezogeneBemerkungChanges.value.size + fehlstundenChanges.value.size + fachbezogeneFehlstundenChanges.value.size + lernbereichNoteChanges.value.size + teilleistungNoteChanges.value.size + noteQuartalChanges.value.size)
+  const hasMahnungChanges = computed(() => mahnungChanges.value.size > 0)
+  const mahnungChangeCount = computed(() => mahnungChanges.value.size)
+  const hasZuweisungChanges = computed(() => zuweisungChanges.value.size > 0)
+  const zuweisungChangeCount = computed(() => zuweisungChanges.value.size)
+  const hasAnyChanges = computed(() => zuweisungChanges.value.size > 0 || mahnungChanges.value.size > 0 || noteChanges.value.size > 0 || bemerkungChanges.value.size > 0 || fachbezogeneBemerkungChanges.value.size > 0 || fehlstundenChanges.value.size > 0 || fachbezogeneFehlstundenChanges.value.size > 0 || lernbereichNoteChanges.value.size > 0 || teilleistungNoteChanges.value.size > 0 || noteQuartalChanges.value.size > 0)
+  const totalChangeCount = computed(() => zuweisungChanges.value.size + mahnungChanges.value.size + noteChanges.value.size + bemerkungChanges.value.size + fachbezogeneBemerkungChanges.value.size + fehlstundenChanges.value.size + fachbezogeneFehlstundenChanges.value.size + lernbereichNoteChanges.value.size + teilleistungNoteChanges.value.size + noteQuartalChanges.value.size)
 
   function getChangeKey(schuelerId: number, lerngruppeId: number): string {
     return `${schuelerId}:${lerngruppeId}`
@@ -514,6 +534,92 @@ export const useConferenceStore = defineStore('conference', () => {
     return noteQuartalChanges.value.has(getChangeKey(schuelerId, lerngruppeId))
   }
 
+  // Mahnung (Kennzeichen „gemahnt“); das Mahndatum wird vom Server nicht aus dem ENM übernommen
+  function getOriginalMahnung(schuelerId: number, lerngruppeId: number): boolean {
+    const schueler = enmExport.value?.schueler.find(s => s.id === schuelerId)
+    return schueler?.leistungsdaten.find(ld => ld.lerngruppenID === lerngruppeId)?.istGemahnt ?? false
+  }
+
+  /** Eine Mahnung mit Mahndatum darf nicht geändert werden (der Server lehnt das ab). */
+  function isMahnungEditable(schuelerId: number, lerngruppeId: number): boolean {
+    const schueler = enmExport.value?.schueler.find(s => s.id === schuelerId)
+    const leistung = schueler?.leistungsdaten.find(ld => ld.lerngruppenID === lerngruppeId)
+    return !!leistung && !(leistung.mahndatum ?? '').trim()
+  }
+
+  function getMahnung(schuelerId: number, lerngruppeId: number): boolean {
+    const key = getChangeKey(schuelerId, lerngruppeId)
+    return mahnungChanges.value.get(key) ?? getOriginalMahnung(schuelerId, lerngruppeId)
+  }
+
+  function updateMahnung(schuelerId: number, lerngruppeId: number, gemahnt: boolean): void {
+    if (!isMahnungEditable(schuelerId, lerngruppeId)) return
+    const key = getChangeKey(schuelerId, lerngruppeId)
+    if (getOriginalMahnung(schuelerId, lerngruppeId) === gemahnt) {
+      mahnungChanges.value.delete(key)
+      return
+    }
+    mahnungChanges.value.set(key, gemahnt)
+  }
+
+  function isMahnungChanged(schuelerId: number, lerngruppeId: number): boolean {
+    return mahnungChanges.value.has(getChangeKey(schuelerId, lerngruppeId))
+  }
+
+  function listMahnungChanges(): MahnungChange[] {
+    const changes: MahnungChange[] = []
+    for (const [key, newValue] of mahnungChanges.value) {
+      const [schueler, lerngruppe] = key.split(':')
+      const schuelerId = Number(schueler)
+      const lerngruppeId = Number(lerngruppe)
+      changes.push({ schuelerId, lerngruppeId, originalValue: getOriginalMahnung(schuelerId, lerngruppeId), newValue })
+    }
+    return changes
+  }
+
+  // Kurszuweisungen für den nächsten Kursabschnitt (E/G u. a., nur Schulformen GE, PS, SK)
+  const ZUWEISUNG_SCHULFORMEN = ['GE', 'PS', 'SK']
+
+  const zuweisungenVerfuegbar = computed(() => ZUWEISUNG_SCHULFORMEN.includes(enmExport.value?.schulform ?? ''))
+
+  function getOriginalZuweisung(schuelerId: number, lerngruppeId: number): string | null {
+    const schueler = enmExport.value?.schueler.find(s => s.id === schuelerId)
+    const wert = schueler?.leistungsdaten.find(ld => ld.lerngruppenID === lerngruppeId)?.neueZuweisungKursart
+    return wert?.trim() ? wert.trim() : null
+  }
+
+  function getZuweisung(schuelerId: number, lerngruppeId: number): string | null {
+    const key = getChangeKey(schuelerId, lerngruppeId)
+    return zuweisungChanges.value.has(key)
+      ? (zuweisungChanges.value.get(key) ?? null)
+      : getOriginalZuweisung(schuelerId, lerngruppeId)
+  }
+
+  function updateZuweisung(schuelerId: number, lerngruppeId: number, zuweisung: string | null): void {
+    const key = getChangeKey(schuelerId, lerngruppeId)
+    const neu = zuweisung?.trim() ? zuweisung.trim() : null
+    if (getOriginalZuweisung(schuelerId, lerngruppeId) === neu) {
+      zuweisungChanges.value.delete(key)
+      return
+    }
+    zuweisungChanges.value.set(key, neu)
+  }
+
+  function isZuweisungChanged(schuelerId: number, lerngruppeId: number): boolean {
+    return zuweisungChanges.value.has(getChangeKey(schuelerId, lerngruppeId))
+  }
+
+  function listZuweisungChanges(): ZuweisungChange[] {
+    const changes: ZuweisungChange[] = []
+    for (const [key, newValue] of zuweisungChanges.value) {
+      const [schueler, lerngruppe] = key.split(':')
+      const schuelerId = Number(schueler)
+      const lerngruppeId = Number(lerngruppe)
+      changes.push({ schuelerId, lerngruppeId, originalValue: getOriginalZuweisung(schuelerId, lerngruppeId), newValue })
+    }
+    return changes
+  }
+
   function clearNoteChanges(): void {
     noteChanges.value.clear()
   }
@@ -521,6 +627,8 @@ export const useConferenceStore = defineStore('conference', () => {
   function clearAllChanges(): void {
     noteChanges.value.clear()
     noteQuartalChanges.value.clear()
+    mahnungChanges.value.clear()
+    zuweisungChanges.value.clear()
     bemerkungChanges.value.clear()
     fachbezogeneBemerkungChanges.value.clear()
     fehlstundenChanges.value.clear()
@@ -563,6 +671,24 @@ export const useConferenceStore = defineStore('conference', () => {
       if (!leistung) continue
       leistung.noteQuartal = change.newNote
       leistung.tsNoteQuartal = tsNow
+    }
+
+    for (const change of listZuweisungChanges()) {
+      const schueler = patched.schueler.find(s => s.id === change.schuelerId)
+      if (!schueler) continue
+      const leistung = schueler.leistungsdaten.find(ld => ld.lerngruppenID === change.lerngruppeId)
+      if (!leistung) continue
+      leistung.neueZuweisungKursart = change.newValue
+      leistung.tsNeueZuweisungKursart = tsNow
+    }
+
+    for (const change of listMahnungChanges()) {
+      const schueler = patched.schueler.find(s => s.id === change.schuelerId)
+      if (!schueler) continue
+      const leistung = schueler.leistungsdaten.find(ld => ld.lerngruppenID === change.lerngruppeId)
+      if (!leistung) continue
+      leistung.istGemahnt = change.newValue
+      leistung.tsIstGemahnt = tsNow
     }
 
     for (const change of listBemerkungChanges()) {
@@ -1095,6 +1221,8 @@ export const useConferenceStore = defineStore('conference', () => {
       enmExport.value = await parseEnmGzip(file)
       noteChanges.value.clear()
       noteQuartalChanges.value.clear()
+      mahnungChanges.value.clear()
+      zuweisungChanges.value.clear()
       bemerkungChanges.value.clear()
       fachbezogeneBemerkungChanges.value.clear()
       fehlstundenChanges.value.clear()
@@ -1193,6 +1321,8 @@ export const useConferenceStore = defineStore('conference', () => {
       enmExport.value = await parseEnmGzip(buffer)
       noteChanges.value.clear()
       noteQuartalChanges.value.clear()
+      mahnungChanges.value.clear()
+      zuweisungChanges.value.clear()
       bemerkungChanges.value.clear()
       fachbezogeneBemerkungChanges.value.clear()
       fehlstundenChanges.value.clear()
@@ -1239,6 +1369,8 @@ export const useConferenceStore = defineStore('conference', () => {
     selectedLerngruppeId.value = null
     noteChanges.value.clear()
     noteQuartalChanges.value.clear()
+    mahnungChanges.value.clear()
+    zuweisungChanges.value.clear()
     bemerkungChanges.value.clear()
     fachbezogeneBemerkungChanges.value.clear()
     fehlstundenChanges.value.clear()
@@ -1301,6 +1433,20 @@ export const useConferenceStore = defineStore('conference', () => {
     importPatchedExportToServer,
     listNoteChanges,
     listNoteQuartalChanges,
+    zuweisungenVerfuegbar,
+    getZuweisung,
+    updateZuweisung,
+    isZuweisungChanged,
+    listZuweisungChanges,
+    hasZuweisungChanges,
+    zuweisungChangeCount,
+    getMahnung,
+    updateMahnung,
+    isMahnungChanged,
+    isMahnungEditable,
+    listMahnungChanges,
+    hasMahnungChanges,
+    mahnungChangeCount,
     hasNoteQuartalChanges,
     noteQuartalChangeCount,
     // Bemerkungen

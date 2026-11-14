@@ -7,6 +7,7 @@ type LupeSubject = {
   lgId: number
   lehrerText: string
   note: Notenkuerzel | null
+  mahnung?: { state: 'markiert' | 'gemahnt'; kurz: string; titel: string } | null
   tone: {
     frame: string
     note: string
@@ -44,6 +45,9 @@ export function createLupeCardsVNodes(params: {
       h('option', { value: '' }, '–'),
       ...notenOptions.map((item: EnmNote) => h('option', { value: item.kuerzel }, getNoteDisplay(item.kuerzel))),
     ]),
+    subject.mahnung
+      ? h('span', { class: `lupe-mahnung lupe-mahnung-card is-${subject.mahnung.state}`, title: subject.mahnung.titel }, subject.mahnung.kurz)
+      : null,
     h('div', { class: `lupe-fach-label ${subject.tone.label}` }, subject.tone.text),
     h('div', { class: 'lupe-fach-lehrer' }, subject.lehrerText),
   ]))
