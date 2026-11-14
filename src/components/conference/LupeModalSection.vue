@@ -1,7 +1,8 @@
 <script lang="ts">
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, reactive } from 'vue'
 import type { PropType } from 'vue'
-import type { Notenkuerzel, EnmNote } from '../../types/enm'
+import type { Notenkuerzel, EnmNote, EnmFach } from '../../types/enm'
+import FloskelPickerDialog from './FloskelPickerDialog.vue'
 
 export default defineComponent({
   name: 'LupeModalSection',
@@ -81,6 +82,49 @@ export default defineComponent({
     const getTeilleistungByArtID = (subject: any, artID: number) => {
       if (!subject.teilleistungen) return null
       return subject.teilleistungen.find((tl: any) => tl.artID === artID) ?? null
+    }
+
+    // Floskeldialog (Doppelklick in ein Bemerkungsfeld)
+    type FloskelTarget =
+      | { kind: 'card'; field: 'ASV' | 'AUE' | 'ZB' }
+      | { kind: 'fach'; lgId: number; fachId: number }
+    const floskelDialog = reactive<{ open: boolean; target: FloskelTarget | null; title: string; value: string }>({
+      open: false, target: null, title: '', value: '',
+    })
+
+    const openFloskelDialog = (target: FloskelTarget, title: string, value: string) => {
+      floskelDialog.target = target
+      floskelDialog.title = title
+      floskelDialog.value = value
+      floskelDialog.open = true
+    }
+
+    const closeFloskelDialog = () => {
+      floskelDialog.open = false
+      floskelDialog.target = null
+    }
+
+    const applyFloskelDialog = (value: string) => {
+      const target = floskelDialog.target
+      if (target && props.selectedSchueler) {
+        const id = props.selectedSchueler.schueler.id
+        const trimmed = value.trim() || null
+        if (target.kind === 'card') props.store.updateBemerkungenValue(id, target.field, trimmed)
+        else props.store.updateFachbezogeneBemerkungValue(id, target.lgId, trimmed)
+      }
+      closeFloskelDialog()
+    }
+
+    const floskelErlaubteGruppen = (): string[] => {
+      const target = floskelDialog.target
+      if (!target) return []
+      return [target.kind === 'card' ? target.field : 'FACH']
+    }
+
+    const floskelFach = (): EnmFach | null => {
+      const target = floskelDialog.target
+      if (target?.kind !== 'fach') return null
+      return props.store.enmExport?.faecher.find((f: EnmFach) => f.id === target.fachId) ?? null
     }
 
     return () => {
@@ -338,6 +382,12 @@ export default defineComponent({
                               class: `lupe-table-remark-input ${props.selectedSchueler && props.store.isFachbezogeneBemerkungChanged(props.selectedSchueler.schueler.id, subject.lgId) ? 'changed' : ''}`.trim(),
                               value: subject.fachbezogeneBemerkung?.trim() ?? '',
                               placeholder: 'Keine fachbezogene Bemerkung',
+                              title: 'Doppelklick: Floskeln auswählen',
+                              onDblclick: () => openFloskelDialog(
+                                { kind: 'fach', lgId: subject.lgId, fachId: subject.fachId },
+                                `Fachbezogene Bemerkung · ${subject.fachName}`,
+                                subject.fachbezogeneBemerkung?.trim() ?? '',
+                              ),
                               onInput: (event: Event) => {
                                 if (!props.selectedSchueler) return
                                 const value = (event.target as HTMLInputElement).value.trim()
@@ -394,6 +444,8 @@ export default defineComponent({
                 class: 'lupe-remark-textarea',
                 value: card.value?.trim() ?? '',
                 placeholder: '(Leer lassen für keine Bemerkung)',
+                title: 'Doppelklick: Floskeln auswählen',
+                onDblclick: () => openFloskelDialog({ kind: 'card', field: card.field }, card.label, card.value?.trim() ?? ''),
                 onInput: (event: Event) => {
                   if (!props.selectedSchueler) return
                   const value = (event.target as HTMLTextAreaElement).value.trim()
@@ -403,6 +455,20 @@ export default defineComponent({
             ])),
           ]),
         ]),
+        h(FloskelPickerDialog, {
+          open: floskelDialog.open,
+          title: floskelDialog.title,
+          modelValue: floskelDialog.value,
+          gruppen: props.store.enmExport?.floskelgruppen ?? [],
+          erlaubteGruppen: floskelErlaubteGruppen(),
+          faecher: props.store.enmExport?.faecher ?? [],
+          jahrgaenge: props.store.enmExport?.jahrgaenge ?? [],
+          schueler: props.selectedSchueler?.schueler ?? null,
+          fach: floskelFach(),
+          klasseKuerzel: props.selectedKlasseLabel,
+          onClose: closeFloskelDialog,
+          onApply: applyFloskelDialog,
+        }),
       ])
       : null
     }

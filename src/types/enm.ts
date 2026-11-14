@@ -92,6 +92,21 @@ export interface EnmLehrer {
   tsPasswordHash: string | null
 }
 
+export interface EnmFloskel {
+  kuerzel: string
+  text: string
+  fachID: number | null
+  niveau: string | null
+  jahrgangID: number | null
+}
+
+export interface EnmFloskelgruppe {
+  kuerzel: string
+  bezeichnung: string
+  hauptgruppe: string
+  floskeln: readonly EnmFloskel[]
+}
+
 export interface EnmLerngruppe {
   id: number
   kID: number             // Kurs-ID im SVWS
@@ -228,7 +243,7 @@ export interface EnmExport {
   foerderschwerpunkte: unknown[]
   jahrgaenge: EnmJahrgang[]
   klassen: EnmKlasse[]
-  floskelgruppen: unknown[]
+  floskelgruppen: EnmFloskelgruppe[]
   lehrer: EnmLehrer[]
   faecher: EnmFach[]
   ankreuzkompetenzen: unknown[]

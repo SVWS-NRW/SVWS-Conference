@@ -17,7 +17,7 @@ Dieses Kapitel beschreibt die wichtigsten Bereiche der Benutzeroberfläche und i
 
 <p style="text-align:center"><img src="../assets/klassenuebersicht.png" alt="Klassenübersichtstabelle" style="max-width:150%; height:480px;" /></p>
 
-- **Schülerlupe (Schnellansicht)**: Per Lupe-Icon oder Doppelklick auf einen Schüler öffnen Sie eine kompakte Schnellansicht: Notenübersicht, Fehlstunden und Bemerkungen für die Konferenz. Diese Ansicht ist ideal, um vor einer Entscheidung schnell die relevanten Informationen zu prüfen, ohne das Hauptfenster zu verlassen. (Screenshot 3 zeigt die Schülerlupe.)
+- **Schülerlupe (Schnellansicht)**: Per Lupe-Icon oder Doppelklick auf einen Schüler öffnen Sie eine kompakte Schnellansicht: Notenübersicht, Fehlstunden und Bemerkungen für die Konferenz. Diese Ansicht ist ideal, um vor einer Entscheidung schnell die relevanten Informationen zu prüfen, ohne das Hauptfenster zu verlassen. (Screenshot 3 zeigt die Schülerlupe.) In den Bemerkungsfeldern (ASV, AUE, Zeugnisbemerkungen und fachbezogene Bemerkungen) öffnet ein Doppelklick den Floskeldialog, in dem Sie Textbausteine filtern und einfügen können.
 
 <p style="text-align:center"><img src="../assets/schuelerlupe.png" alt="Schülerlupe (Schnellansicht)" style="max-width:100%; height:240px;" /></p>
 
