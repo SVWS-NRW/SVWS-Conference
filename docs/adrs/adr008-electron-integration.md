@@ -20,10 +20,12 @@ Umsetzung:
   Zertifikate.
 - `package.json` — `"main": "electron/main.cjs"`, electron-builder-Konfiguration, Skripte
   `electron:dev` / `electron:build`.
-- `scripts/release.mjs` — baut in einem Durchgang: 1) den Vite-Offline-Build,
+- `scripts/release.mjs` — Release-Ablauf: Version erhöhen, bauen (`release:build`), Commit/Tag
+  pushen und GitHub-Release-Entwurf anlegen (`release:github`), wie in SVWS-Prognos und SVWS-MA2LBV.
+- `scripts/release-build.mjs` — baut in einem Durchgang: 1) den Vite-Offline-Build,
   2) AppImage + NSIS-Installer via electron-builder, 3) ein Webserver-ZIP für den reinen
   Browser-Betrieb.
-- `npm run release` erzeugt alle drei Artefakte.
+- `npm run release:build` erzeugt alle drei Artefakte; `npm run release` veröffentlicht sie als GitHub-Release-Entwurf.
 
 Referenzprojekt mit vergleichbarer Struktur: `SVWS-Import`
 (`/home/pfotenhauer/git/SVWS-Import/`).

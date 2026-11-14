@@ -1,82 +1,98 @@
+#!/usr/bin/env node
+// Release-Ablauf: Version erhöhen → bauen → Commit und Tag pushen → GitHub-Release-Entwurf anlegen.
+//
+// Aufruf:
+//   npm run release          # patch: 0.3.3 → 0.3.4
+//   npm run release minor    # minor: 0.3.3 → 0.4.0
+//   npm run release major    # major: 0.3.3 → 1.0.0
+//   npm run release --minor      # Flag-Schreibweise, mit oder ohne -- davor
+//
+// Schlägt der Build fehl, wird die Versionserhöhung (Commit + Tag) lokal zurückgenommen.
+// Gepusht wird erst nach erfolgreichem Build.
+
 import { execSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
-import os from 'node:os'
-import path from 'node:path'
-import { zipSync } from 'fflate'
+import { readFileSync } from 'node:fs'
 
-const { version } = JSON.parse(readFileSync('./package.json', 'utf8'))
-const distDir = path.resolve('dist')
-const releaseDir = path.resolve('release')
-const zipName = `svws-conference-${version}-webserver.zip`
+const BUMP_TYPES = ['patch', 'minor', 'major']
 
-const SIGN_SCRIPT = process.env.SIGN_SCRIPT ?? path.join(os.homedir(), 'git/svws-sign-linux/sign-windows-exe.sh')
-const SAFENET_MODULE = process.env.SAFENET_MODULE ?? '/usr/lib/libeToken.so'
-
-console.log('Bereinige Release-Verzeichnis...')
-await rm(releaseDir, { recursive: true, force: true })
-
-console.log('Baue Projekt...')
-execSync('npm run build', { stdio: 'inherit' })
-
-console.log('Baue Electron-App (Linux AppImage + Windows NSIS)...')
-execSync('npx electron-builder --linux AppImage --win nsis', { stdio: 'inherit' })
-
-function safenetTokenPresent() {
-  if (!existsSync(SAFENET_MODULE)) return false
-  try {
-    const out = execSync(`pkcs11-tool --module "${SAFENET_MODULE}" --list-token-slots`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    return /token label/i.test(out)
-  } catch {
-    return false
-  }
+function run(cmd) {
+  execSync(cmd, { stdio: 'inherit' })
 }
 
-function signWindowsInstaller() {
-  const installerName = readdirSync(releaseDir).find((name) => name.endsWith('.exe'))
-  if (!installerName) return
-
-  const installerPath = path.join(releaseDir, installerName)
-
-  if (!existsSync(SIGN_SCRIPT)) {
-    console.log('Signier-Skript nicht gefunden — Windows-Installer bleibt unsigniert.')
-    return
-  }
-  if (!safenetTokenPresent()) {
-    console.log('Kein SafeNet eToken erkannt — Windows-Installer bleibt unsigniert.')
-    return
-  }
-
-  console.log('Signiere Windows-Installer (SafeNet eToken)...')
-  try {
-    execSync(`"${SIGN_SCRIPT}" --token safenet "${installerPath}" "${installerPath}"`, { stdio: 'inherit' })
-  } catch (err) {
-    console.warn(`Signieren fehlgeschlagen (${err.message}) — Installer bleibt unsigniert.`)
-  }
+function output(cmd) {
+  return execSync(cmd, { encoding: 'utf8' }).trim()
 }
 
-signWindowsInstaller()
-
-function collectFiles(dir, base = '') {
-  const entries = {}
-  for (const name of readdirSync(dir)) {
-    const full = path.join(dir, name)
-    const relative = base ? `${base}/${name}` : name
-    if (statSync(full).isDirectory()) {
-      Object.assign(entries, collectFiles(full, relative))
-    } else {
-      entries[relative] = readFileSync(full)
-    }
-  }
-  return entries
+function fail(message) {
+  console.error(`\n✖ ${message}`)
+  process.exit(1)
 }
 
-console.log('Erstelle Webserver-ZIP...')
-await mkdir(releaseDir, { recursive: true })
-const zipped = zipSync(collectFiles(distDir))
-await writeFile(path.join(releaseDir, zipName), zipped)
+function readVersion() {
+  return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+}
 
-console.log(`Release erstellt: release/${zipName}`)
+// ── Parameter ────────────────────────────────────────────────────────────────
+
+// Ohne -- davor reicht npm ein Flag wie --minor nicht durch, sondern setzt npm_config_minor
+const flags = BUMP_TYPES.filter(t => process.env[`npm_config_${t}`] === 'true')
+const args = [...process.argv.slice(2).map(a => a.replace(/^-+/, '')), ...flags]
+const unknown = args.filter(a => !BUMP_TYPES.includes(a))
+if (unknown.length > 0 || new Set(args).size > 1) {
+  fail(`Unbekannter oder mehrfacher Parameter: ${args.join(' ')}\n  Erlaubt: ${BUMP_TYPES.join(' | ')} (Standard: patch)`)
+}
+const bump = args[0] ?? 'patch'
+
+// ── Vorabprüfungen (bevor irgendetwas verändert wird) ────────────────────────
+
+if (output('git status --porcelain') !== '') {
+  fail('Das Arbeitsverzeichnis enthält nicht committete Änderungen. Bitte zuerst committen.')
+}
+try {
+  output('gh auth status')
+} catch {
+  fail('Die GitHub CLI ist nicht angemeldet. Bitte zuerst `gh auth login` ausführen.')
+}
+const branch = output('git rev-parse --abbrev-ref HEAD')
+try {
+  output('git rev-parse --abbrev-ref --symbolic-full-name @{u}')
+} catch {
+  fail(`Der Branch "${branch}" hat keinen Upstream auf GitHub. Bitte zuerst \`git push -u origin ${branch}\` ausführen.`)
+}
+
+const oldVersion = readVersion()
+
+// ── 1. Version erhöhen (Commit + Tag, lokal) ────────────────────────────────
+
+run(`npm version ${bump} -m "%s"`)
+const version = readVersion()
+console.log(`\n▶ Version ${oldVersion} → ${version} (Branch ${branch})\n`)
+
+// ── 2. Bauen ─────────────────────────────────────────────────────────────────
+
+try {
+  run('npm run release:build')
+} catch {
+  console.error(`\n✖ Build fehlgeschlagen – Versionserhöhung auf ${version} wird zurückgenommen.`)
+  run(`git tag -d v${version}`)
+  run('git reset --keep HEAD~1')
+  fail(`Version steht wieder auf ${oldVersion}. Fehler beheben und \`npm run release ${bump}\` erneut ausführen.`)
+}
+
+// ── 3. Commit und Tag pushen ─────────────────────────────────────────────────
+
+try {
+  run('git push --follow-tags')
+} catch {
+  fail(`Push fehlgeschlagen. Commit und Tag v${version} sind lokal vorhanden.\n  Nach Behebung: \`git push --follow-tags && npm run release:github\``)
+}
+
+// ── 4. GitHub-Release-Entwurf anlegen ────────────────────────────────────────
+
+try {
+  run('npm run release:github')
+} catch {
+  fail(`Anlegen des Release-Entwurfs fehlgeschlagen. Die Dateien liegen in release/.\n  Erneut versuchen mit: \`npm run release:github\``)
+}
+
+console.log(`\n✔ Release-Entwurf v${version} ist auf GitHub angelegt. Dort Release-Notes eintragen und veröffentlichen.`)

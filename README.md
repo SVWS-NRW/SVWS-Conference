@@ -36,10 +36,21 @@ Hinweis: Der Standard-Build ist bewusst offline-fähig erzeugt, damit das Öffne
 ## Release erstellen
 
 ```bash
-npm run release
+npm run release          # Patch-Version erhöhen, z. B. 1.0.0 → 1.0.1
+npm run release minor    # Minor-Version erhöhen, z. B. 1.0.0 → 1.1.0
+npm run release major    # Major-Version erhöhen, z. B. 1.0.0 → 2.0.0
 ```
 
-Baut das Projekt und erstellt eine ZIP-Datei im Ordner `release/`, die alle Dateien aus `dist/` enthält — inklusive `impressum.example.js`. Die Datei ist versioniert benannt, z. B. `svws-conference-0.4.0.zip`, und kann direkt an Schulen weitergegeben werden.
+Der Ablauf (`scripts/release.mjs`):
+
+1. Version in `package.json` erhöhen (Commit und Tag `v<version>`, lokal)
+2. Bauen (`npm run release:build`): Linux-AppImage, Windows-Installer (NSIS, signiert, wenn das SafeNet-Token vorhanden ist) und Webserver-ZIP im Ordner `release/`
+3. Commit und Tag pushen (nur nach erfolgreichem Build; bei Build-Fehler wird die Versionserhöhung zurückgenommen)
+4. GitHub-Release als **Entwurf** anlegen (`npm run release:github`) und die drei Dateien hochladen
+
+Voraussetzungen: Arbeitsverzeichnis ohne nicht committete Änderungen, Branch mit Upstream auf GitHub und angemeldete GitHub CLI (`gh auth login`). Die Release-Notes werden anschließend auf GitHub eingetragen und das Release dort veröffentlicht.
+
+Die Artefakte heißen `SVWS-Conference-<version>.AppImage`, `SVWS-Conference-Setup-<version>.exe` und `SVWS-Conference-<version>-webserver.zip`. Nur bauen, ohne Version zu erhöhen oder hochzuladen: `npm run release:build`.
 
 ## Qualitätssicherung
 
