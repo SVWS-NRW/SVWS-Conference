@@ -1,12 +1,16 @@
 import { h } from 'vue'
 import type { Notenkuerzel, EnmNote } from '../types/enm'
+import { ZUWEISUNG_OPTIONEN, getZuweisungTitel } from './zuweisungen'
 
 type LupeSubject = {
   fachKuerzel: string
-  fachName: string
   lgId: number
   lehrerText: string
   note: Notenkuerzel | null
+  fachName: string
+  istFld?: boolean
+  zuweisung?: string | null
+  zuweisungGeaendert?: boolean
   mahnung?: { state: 'markiert' | 'gemahnt'; kurz: string; titel: string } | null
   tone: {
     frame: string
@@ -22,6 +26,8 @@ export function createLupeCardsVNodes(params: {
   notenOptions: EnmNote[]
   getNoteDisplay: (note: Notenkuerzel | null) => string
   onUpdateNote: (schuelerId: number, lgId: number, note: Notenkuerzel | null) => void
+  zuweisungenVerfuegbar?: boolean
+  onUpdateZuweisung?: (schuelerId: number, lgId: number, zuweisung: string | null) => void
 }): any[] {
   const {
     selectedSchuelerId,
@@ -29,7 +35,32 @@ export function createLupeCardsVNodes(params: {
     notenOptions,
     getNoteDisplay,
     onUpdateNote,
+    zuweisungenVerfuegbar = false,
+    onUpdateZuweisung,
   } = params
+
+  const renderZuweisung = (subject: LupeSubject) => h('label', {
+    class: `lupe-fach-zuweisung ${subject.istFld ? 'is-fld' : ''}`.trim(),
+    title: 'Kursart im nächsten Kursabschnitt',
+  }, [
+    h('span', { class: 'lupe-fach-zuweisung-label' }, 'Zuweisung'),
+    h('select', {
+      class: `lupe-zuweisung-select ${subject.zuweisungGeaendert ? 'changed' : ''}`.trim(),
+      value: subject.zuweisung ?? '',
+      title: getZuweisungTitel(subject.zuweisung),
+      'aria-label': `Zuweisung ${subject.fachName}`,
+      onChange: (event: Event) => {
+        const wert = (event.target as HTMLSelectElement).value
+        onUpdateZuweisung?.(selectedSchuelerId, subject.lgId, wert || null)
+      },
+    }, [
+      h('option', { value: '' }, '–'),
+      ...ZUWEISUNG_OPTIONEN.map(o => h('option', { value: o.wert, title: o.label }, o.wert)),
+      ...(subject.zuweisung && !ZUWEISUNG_OPTIONEN.some(o => o.wert === subject.zuweisung)
+        ? [h('option', { value: subject.zuweisung }, subject.zuweisung)]
+        : []),
+    ]),
+  ])
 
   return lupeSubjects.map(subject => h('div', { class: `lupe-fach ${subject.tone.frame}` }, [
     h('div', { class: 'lupe-fach-k' }, subject.fachKuerzel),
@@ -50,5 +81,6 @@ export function createLupeCardsVNodes(params: {
       : null,
     h('div', { class: `lupe-fach-label ${subject.tone.label}` }, subject.tone.text),
     h('div', { class: 'lupe-fach-lehrer' }, subject.lehrerText),
+    zuweisungenVerfuegbar ? renderZuweisung(subject) : null,
   ]))
 }

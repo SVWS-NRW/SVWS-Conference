@@ -32,7 +32,7 @@ type RuntimeSvwsConfig = {
 }
 
 // The keys of the Lupe detail table columns. Used for resize state and rendering.
-type LupeColumnKey = 'fach' | 'kursart' | 'lehrer' | 'fs' | 'fsu' | 'note'
+type LupeColumnKey = 'fach' | 'kursart' | 'lehrer' | 'zuweisung' | 'fs' | 'fsu' | 'note'
 
 const RUNTIME_CONFIG_STORAGE_KEY = 'svws-conference.runtime-config'
 
@@ -166,6 +166,7 @@ const App = defineComponent({
       fach: 96,
       kursart: 78,
       lehrer: 128,
+      zuweisung: 88,
       fs: 66,
       fsu: 66,
       note: 108,
@@ -174,6 +175,7 @@ const App = defineComponent({
       fach: 56,
       kursart: 52,
       lehrer: 84,
+      zuweisung: 60,
       fs: 48,
       fsu: 48,
       note: 78,
@@ -672,6 +674,10 @@ const App = defineComponent({
           onUpdateNote: (schuelerId: number, lgId: number, note: Notenkuerzel | null) => {
             store.updateNote(schuelerId, lgId, note)
           },
+          zuweisungenVerfuegbar: store.zuweisungenVerfuegbar,
+          onUpdateZuweisung: (schuelerId: number, lgId: number, zuweisung: string | null) => {
+            store.updateZuweisung(schuelerId, lgId, zuweisung)
+          },
         })
         : []
 
@@ -843,6 +849,9 @@ const App = defineComponent({
               },
               onOpenTimer: () => {
                 timerModalOpen.value = true
+              },
+              onOpenChanges: () => {
+                changesModalOpen.value = true
               },
               onNavigateSchueler: (direction: -1 | 1) => {
                 navigateSchueler(direction)

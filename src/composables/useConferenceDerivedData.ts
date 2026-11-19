@@ -35,7 +35,7 @@ export function buildConferenceDerivedData(params: {
   notenAnzeigeMode: 'noten' | 'punkte'
   noteCycleMode: 'halbjahr' | 'quartal'
   lupeFehlstundenMode: 'gesamt' | 'fach'
-  lupeColumnWidths: Record<'fach' | 'kursart' | 'lehrer' | 'fs' | 'fsu' | 'note', number>
+  lupeColumnWidths: Record<'fach' | 'kursart' | 'lehrer' | 'zuweisung' | 'fs' | 'fsu' | 'note', number>
   timerRunning: boolean
   timerRemainingSeconds: number
   timerTotalSeconds: number
@@ -215,6 +215,7 @@ export function buildConferenceDerivedData(params: {
   const lupeTableMinWidth = lupeColumnWidths.fach
     + lupeColumnWidths.kursart
     + lupeColumnWidths.lehrer
+    + (store.zuweisungenVerfuegbar ? lupeColumnWidths.zuweisung : 0)
     + (lupeFehlstundenMode === 'fach' ? lupeColumnWidths.fs + lupeColumnWidths.fsu : 0)
     + lupeColumnWidths.note
     + LUPE_MAHNUNG_COL_WIDTH

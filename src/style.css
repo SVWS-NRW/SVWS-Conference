@@ -1410,6 +1410,54 @@ td.changed {
   font-size: 22px;
 }
 
+.lupe-changed-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 72px;
+  padding: 4px 10px;
+  border: 1px solid var(--conf-border);
+  border-radius: 8px;
+  background: var(--conf-surface-sub);
+  line-height: 1.1;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lupe-changed-chip:hover {
+  border-color: var(--conf-accent);
+}
+
+.lupe-changed-chip:focus-visible {
+  outline: 2px solid var(--conf-accent);
+  outline-offset: 2px;
+}
+
+.lupe-changed-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--conf-ink-soft);
+}
+
+.lupe-changed-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--conf-ink);
+}
+
+.lupe-changed-chip.has-changes {
+  border-color: var(--conf-accent);
+  background: var(--conf-accent-bg);
+}
+
+.lupe-changed-chip.has-changes .lupe-changed-val {
+  color: var(--conf-accent-dark);
+}
+
 .lupe-avatar {
   width: 56px;
   height: 56px;
@@ -2253,108 +2301,50 @@ td.changed {
   margin-bottom: 4px;
 }
 
-/* Zuweisungen (Kursart im nächsten Kursabschnitt) */
-.lupe-stat-box-zuweisung {
-  flex: 0 1 160px;
-  min-width: 160px;
+/* Zuweisungen (Kursart im nächsten Kursabschnitt) als Spalte der Lupe-Tabelle */
+.lupe-table .lupe-col-zuweisung {
+  white-space: nowrap;
 }
 
-.lupe-zuweisung-btn {
-  width: 100%;
-  min-height: 36px;
-}
-
-.zuweisung-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgba(8, 14, 30, 0.55);
-}
-
-.zuweisung-dialog {
-  width: min(760px, 100%);
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
-  padding: 1rem 1.25rem 1.25rem;
-  border: 1px solid var(--conf-border);
-  border-radius: 14px;
-  background: var(--conf-surface);
-  color: var(--conf-ink);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
-}
-
-.zuweisung-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.zuweisung-title {
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-.zuweisung-sub {
-  margin: 2px 0 0;
-  font-size: 0.9rem;
+.lupe-table .lupe-col-zuweisung:not(.is-fld) .lupe-zuweisung-select:not(.changed) {
   color: var(--conf-ink-soft);
 }
 
-.zuweisung-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.zuweisung-table th,
-.zuweisung-table td {
-  padding: 6px 8px;
-  text-align: left;
-  border-bottom: 1px solid var(--conf-border-soft);
-}
-
-.zuweisung-table th {
-  font-size: 0.82rem;
-  color: var(--conf-ink-soft);
-}
-
-.zuweisung-fach {
-  font-weight: 700;
-}
-
-.zuweisung-table .lupe-table-note-select.changed {
+.lupe-table .lupe-zuweisung-select.changed {
   box-shadow: 0 0 0 2px var(--conf-accent);
 }
 
-.zuweisung-add {
-  display: grid;
-  grid-template-columns: auto 1fr;
+.lupe-fach-zuweisung {
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.9rem;
-  font-size: 0.9rem;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--conf-border-soft);
+  font-size: 13px;
   font-weight: 600;
   color: var(--conf-ink-soft);
 }
 
-.zuweisung-aktion {
-  width: 28px;
-  text-align: center;
-}
-
-.zuweisung-remove {
-  border: none;
-  background: transparent;
-  color: var(--conf-ink-soft);
-  font-size: 18px;
-  line-height: 1;
+.lupe-fach-zuweisung .lupe-zuweisung-select {
+  min-width: 72px;
+  padding: 3px 6px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--conf-ink);
+  background: var(--conf-surface);
+  border: 1px solid var(--conf-border);
+  border-radius: 6px;
   cursor: pointer;
 }
 
-.zuweisung-remove:hover {
-  color: var(--conf-red);
+.lupe-fach-zuweisung:not(.is-fld) .lupe-zuweisung-select:not(.changed) {
+  color: var(--conf-ink-soft);
+  font-weight: 600;
+}
+
+.lupe-fach-zuweisung .lupe-zuweisung-select.changed {
+  box-shadow: 0 0 0 2px var(--conf-accent);
 }

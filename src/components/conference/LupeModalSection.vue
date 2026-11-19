@@ -4,6 +4,7 @@ import type { PropType } from 'vue'
 import type { Notenkuerzel, EnmNote, EnmFach } from '../../types/enm'
 import FloskelPickerDialog from './FloskelPickerDialog.vue'
 import { LUPE_MAHNUNG_COL_WIDTH } from '../../composables/useConferenceDerivedData'
+import { ZUWEISUNG_OPTIONEN, getZuweisungTitel } from '../../utils/zuweisungen'
 
 export default defineComponent({
   name: 'LupeModalSection',
@@ -48,6 +49,7 @@ export default defineComponent({
     'toggleLupeRemarksCollapsed',
     'startLupeColumnResize',
     'openTimer',
+    'openChanges',
   ],
   setup(props, { emit }) {
     // Sammelt alle eindeutigen Teilleistungsarten über alle Subjects
@@ -85,94 +87,29 @@ export default defineComponent({
       return subject.teilleistungen.find((tl: any) => tl.artID === artID) ?? null
     }
 
-    // Zuweisungen (Kursart im nächsten Abschnitt) für Fächer mit Fachleistungsdifferenzierung
-    const zuweisungDialog = reactive<{ open: boolean; extra: string[] }>({ open: false, extra: [] })
-    const ZUWEISUNG_OPTIONEN: Array<{ wert: string; label: string }> = [
-      { wert: 'E', label: 'E-Kurs' },
-      { wert: 'G', label: 'G-Kurs' },
-      { wert: 'FFU', label: 'Fachbezogener Förderunterricht' },
-      { wert: 'FUF', label: 'Fachunabhängiger Förderunterricht' },
-      { wert: 'EGS1', label: 'Ergänzungsstunden' },
-      { wert: 'EGSN', label: 'Ergänzungsstunden mit Benotung' },
-    ]
-
-    const renderZuweisungDialog = () => {
-      const schueler = props.selectedSchueler?.schueler
-      // Zusätzlich hinzugefügte Fächer (z. B. Förderunterricht oder neue FLD-Fächer im nächsten Jahrgang)
-      const extraKey = (lgId: number) => `${schueler?.id}:${lgId}`
-      const istZeile = (subject: any) => subject.istFld || zuweisungDialog.extra.includes(extraKey(subject.lgId))
-      const fldFaecher = props.lupeSubjects.filter(istZeile)
-      const hinzufuegbar = props.lupeSubjects.filter((subject: any) => !istZeile(subject))
-      return h('div', {
-        class: 'zuweisung-overlay',
-        onClick: (event: MouseEvent) => {
-          if (event.target === event.currentTarget) { zuweisungDialog.open = false; zuweisungDialog.extra = [] }
+    // Zuweisungen (Kursart im nächsten Kursabschnitt) — eigene Spalte in der Fächertabelle
+    const renderZuweisungCell = (subject: any) => h('td', {
+      class: `lupe-col-zuweisung ${subject.istFld ? 'is-fld' : ''}`.trim(),
+      style: { width: `${props.lupeColumnWidths.zuweisung}px` },
+    }, [
+      h('select', {
+        class: `lupe-table-note-select lupe-zuweisung-select ${subject.zuweisungGeaendert ? 'changed' : ''}`.trim(),
+        value: subject.zuweisung ?? '',
+        title: getZuweisungTitel(subject.zuweisung),
+        'aria-label': `Zuweisung ${subject.fachName}`,
+        onChange: (event: Event) => {
+          if (!props.selectedSchueler) return
+          const wert = (event.target as HTMLSelectElement).value
+          props.store.updateZuweisung(props.selectedSchueler.schueler.id, subject.lgId, wert || null)
         },
       }, [
-        h('section', { class: 'zuweisung-dialog', role: 'dialog', 'aria-modal': 'true' }, [
-          h('header', { class: 'zuweisung-header' }, [
-            h('div', [
-              h('h2', { class: 'zuweisung-title' }, 'Zuweisungen'),
-              h('p', { class: 'zuweisung-sub' }, `${schueler ? `${schueler.nachname}, ${schueler.vorname}` : ''} · Kursart im nächsten Kursabschnitt`),
-            ]),
-            h('button', { class: 'lupe-view-btn', type: 'button', onClick: () => { zuweisungDialog.open = false; zuweisungDialog.extra = [] } }, 'Schließen'),
-          ]),
-          fldFaecher.length
-            ? h('table', { class: 'zuweisung-table' }, [
-              h('thead', h('tr', [h('th', 'Fach'), h('th', 'Lehrer'), h('th', 'Aktuell'), h('th', 'Zuweisung'), h('th', '')])),
-              h('tbody', fldFaecher.map((subject: any) => h('tr', { key: subject.lgId }, [
-                h('td', { class: 'zuweisung-fach', title: subject.fachName }, subject.fachKuerzel),
-                h('td', subject.lehrerText),
-                h('td', subject.kursart),
-                h('td', [
-                  h('select', {
-                    class: `lupe-table-note-select ${subject.zuweisungGeaendert ? 'changed' : ''}`.trim(),
-                    value: subject.zuweisung ?? '',
-                    onChange: (event: Event) => {
-                      if (!schueler) return
-                      const wert = (event.target as HTMLSelectElement).value
-                      props.store.updateZuweisung(schueler.id, subject.lgId, wert || null)
-                    },
-                  }, [
-                    h('option', { value: '' }, '–'),
-                    ...ZUWEISUNG_OPTIONEN.map(o => h('option', { value: o.wert }, `${o.wert} · ${o.label}`)),
-                    ...(subject.zuweisung && !ZUWEISUNG_OPTIONEN.some(o => o.wert === subject.zuweisung)
-                      ? [h('option', { value: subject.zuweisung }, subject.zuweisung)]
-                      : []),
-                  ]),
-                ]),
-                h('td', { class: 'zuweisung-aktion' }, !subject.istFld && !subject.zuweisung
-                  ? [h('button', {
-                    type: 'button',
-                    class: 'zuweisung-remove',
-                    title: 'Fach aus der Liste entfernen',
-                    onClick: () => { zuweisungDialog.extra = zuweisungDialog.extra.filter(k => k !== extraKey(subject.lgId)) },
-                  }, '×')]
-                  : []),
-              ]))),
-            ])
-            : h('p', { class: 'lupe-empty' }, 'Keine Fächer mit Fachleistungsdifferenzierung.'),
-          hinzufuegbar.length
-            ? h('label', { class: 'zuweisung-add' }, [
-              h('span', 'Fach hinzufügen'),
-              h('select', {
-                class: 'lupe-table-note-select',
-                value: '',
-                onChange: (event: Event) => {
-                  const select = event.target as HTMLSelectElement
-                  const lgId = Number(select.value)
-                  if (lgId && schueler) zuweisungDialog.extra = [...zuweisungDialog.extra, extraKey(lgId)]
-                  select.value = ''
-                },
-              }, [
-                h('option', { value: '' }, '– Fach wählen –'),
-                ...hinzufuegbar.map((subject: any) => h('option', { value: String(subject.lgId) }, `${subject.fachKuerzel} · ${subject.fachName}${subject.kursart && subject.kursart !== '–' ? ` (${subject.kursart})` : ''}`)),
-              ]),
-            ])
-            : null,
-        ]),
-      ])
-    }
+        h('option', { value: '' }, '–'),
+        ...ZUWEISUNG_OPTIONEN.map(o => h('option', { value: o.wert, title: o.label }, o.wert)),
+        ...(subject.zuweisung && !ZUWEISUNG_OPTIONEN.some(o => o.wert === subject.zuweisung)
+          ? [h('option', { value: subject.zuweisung }, subject.zuweisung)]
+          : []),
+      ]),
+    ])
 
     // Floskeldialog (Doppelklick in ein Bemerkungsfeld)
     type FloskelTarget =
@@ -310,6 +247,15 @@ export default defineComponent({
                 onClick: () => emit('close'),
               }, '×'),
             ]),
+            h('button', {
+              type: 'button',
+              class: `lupe-changed-chip ${props.store.totalChangeCount > 0 ? 'has-changes' : ''}`.trim(),
+              title: 'Änderungen anzeigen und exportieren',
+              onClick: () => emit('openChanges'),
+            }, [
+              h('span', { class: 'lupe-changed-label' }, 'Geändert'),
+              h('span', { class: 'lupe-changed-val' }, String(props.store.totalChangeCount)),
+            ]),
           ]),
           h('div', { class: 'lupe-stats-row' }, [
             h('div', { class: 'lupe-stat-box lupe-stat-box-compact' }, [h('div', { class: 'lupe-stat-label' }, 'Ø Note'), h('div', { class: 'lupe-stat-val' }, props.avg)]),
@@ -374,17 +320,6 @@ export default defineComponent({
                 }),
               ])
               : h('div', { class: 'lupe-stat-box lupe-stat-box-fehlstunden' }, [h('div', { class: 'lupe-stat-label' }, 'Fehlstunden unentsch.'), h('div', { class: 'lupe-stat-val' }, '–')]),
-            props.store.zuweisungenVerfuegbar && props.selectedSchueler
-              ? h('div', { class: 'lupe-stat-box lupe-stat-box-zuweisung' }, [
-                h('div', { class: 'lupe-stat-label' }, 'Kurszuweisung'),
-                h('button', {
-                  type: 'button',
-                  class: 'lupe-view-btn lupe-zuweisung-btn',
-                  onClick: () => { zuweisungDialog.open = true },
-                }, 'Zuweisungen'),
-              ])
-              : null,
-            h('div', { class: 'lupe-stat-box' }, [h('div', { class: 'lupe-stat-label' }, 'Geaendert'), h('div', { class: 'lupe-stat-val' }, String(props.store.totalChangeCount))]),
           ]),
           h('div', { class: props.lupeViewMode === 'tabelle' ? 'lupe-grid-wrap lupe-grid-wrap-table' : 'lupe-grid-wrap' }, [
             props.lupeSubjects.length
@@ -406,6 +341,12 @@ export default defineComponent({
                           h('span', { class: 'lupe-th-label' }, 'Lehrerkürzel'),
                           h('span', { class: 'lupe-col-resizer', onMousedown: (event: MouseEvent) => emit('startLupeColumnResize', 'lehrer', event) }),
                         ]),
+                        ...(props.store.zuweisungenVerfuegbar
+                          ? [h('th', { class: 'lupe-col-zuweisung lupe-resizable-col', style: { width: `${props.lupeColumnWidths.zuweisung}px` } }, [
+                            h('span', { class: 'lupe-th-label', title: 'Kursart im nächsten Kursabschnitt' }, 'Zuweisung'),
+                            h('span', { class: 'lupe-col-resizer', onMousedown: (event: MouseEvent) => emit('startLupeColumnResize', 'zuweisung', event) }),
+                          ])]
+                          : []),
                         ...(props.lupeFehlstundenMode === 'fach'
                           ? [
                             h('th', { class: 'lupe-col-fs lupe-resizable-col', style: { width: `${props.lupeColumnWidths.fs}px` } }, [
@@ -439,6 +380,7 @@ export default defineComponent({
                       h('td', { class: 'lupe-table-fach lupe-col-fach', style: { width: `${props.lupeColumnWidths.fach}px` } }, subject.fachKuerzel),
                       h('td', { class: `${subject.kursart === 'LK' ? 'lupe-table-kursart is-lk' : 'lupe-table-kursart'} lupe-col-kursart`.trim(), style: { width: `${props.lupeColumnWidths.kursart}px` } }, subject.kursart),
                       h('td', { class: 'lupe-col-lehrer', style: { width: `${props.lupeColumnWidths.lehrer}px` } }, subject.lehrerText),
+                      ...(props.store.zuweisungenVerfuegbar ? [renderZuweisungCell(subject)] : []),
                       ...(props.lupeFehlstundenMode === 'fach'
                         ? [
                           h('td', { class: `lupe-col-fs lupe-table-number-cell ${props.selectedSchueler && props.store.isFachbezogeneFehlstundenChanged(props.selectedSchueler.schueler.id, subject.lgId, 'fehlstundenFach') ? 'changed' : ''}`.trim(), style: { width: `${props.lupeColumnWidths.fs}px` } }, [
@@ -574,7 +516,6 @@ export default defineComponent({
             ])),
           ]),
         ]),
-        zuweisungDialog.open ? renderZuweisungDialog() : null,
         h(FloskelPickerDialog, {
           open: floskelDialog.open,
           title: floskelDialog.title,
